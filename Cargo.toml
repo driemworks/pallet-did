@@ -1,29 +1,37 @@
 [package]
 name = "pallet-did"
-version = '3.0.0'
+version = '4.0.0'
 description = 'Substrate Decentralized ID Pallet'
-edition = '2018'
+edition = '2021'
 authors = ['Substrate DevHub <https://github.com/substrate-developer-hub>']
 homepage = 'https://substrate.dev'
 repository = 'https://github.com/paritytech/substrate/'
 license = 'Unlicense'
 
-[dependencies]
-codec = { default-features = false, features = ['derive'], package = 'parity-scale-codec', version = '2.0.0' }
-serde = { features = ['derive'], optional = true, version = '1.0.119' }
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
 
-frame-support = { default-features = false, version = '3.0.0' }
-frame-system = { default-features = false, version = '3.0.0' }
-pallet-timestamp = { default_features = false, version = '3.0.0' }
-sp-core = { default-features = false, version = '3.0.0' }
-sp-io = { default-features = false, version = '3.0.0' }
-sp-runtime = { default-features = false, version = '3.0.0' }
-sp-std = { default-features = false, version = '3.0.0' }
+[dependencies]
+codec = { package = "parity-scale-codec", version = "3.0.0", default-features = false, features = [
+	"derive",
+] }
+serde = { version = "1.0.136", optional = true }
+scale-info = { version = "2.1.1", default-features = false, features = ["derive"] }
+
+frame-support = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.37" }
+frame-system = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.37" }
+# pallet-timestamp = { default_features = false, version = '3.0.0' }
+pallet-timestamp = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.37" }
+sp-core = { version = "7.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.37" }
+sp-io = { version = "7.0.0", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.37" }
+sp-runtime = { version = "7.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.37" }
+sp-std = { version = "5.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.37" }
 
 [features]
 default = ['std']
 std = [
 	'serde',
+	'scale-info/std',
 	'codec/std',
 	'frame-support/std',
 	'sp-runtime/std',
