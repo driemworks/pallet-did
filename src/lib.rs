@@ -343,7 +343,7 @@ pub mod pallet {
             let result = Self::attribute_and_id(&identity, &name);
 
             match result {
-                Some((_, id)) => <AttributeOf<T>>::remove(&identity, &id),
+                Some((_, id)) => <AttributeOf<T>>::remove(&identity, id),
                 None => return Err(Error::<T>::AttributeRemovalFailed.into()),
             }
 
@@ -370,9 +370,6 @@ pub mod pallet {
             encoded.extend(transaction.validity.encode());
             encoded.extend(transaction.identity.encode());
 
-            // https://docs.rs/jwt/latest/jwt/
-            // TODO: - Get algorithm type
-
             // Execute the storage update if the signer is valid.
             Self::signed_attribute(who, &encoded, &transaction)?;
             Self::deposit_event(Event::AttributeTransactionExecuted(transaction));
@@ -386,21 +383,13 @@ impl<T: Config> Did<T::AccountId, T::BlockNumber, <<T as Config>::Time as Time>:
     /// Validates if the AccountId 'actual_owner' owns the identity.
     fn is_owner(identity: &T::AccountId, actual_owner: &T::AccountId) -> DispatchResult {
         ensure!(Self::identity_owner(identity) == *actual_owner, Error::<T>::NotOwner);
-        // if Self::identity_owner(identity) == *actual_owner  {
-        //     Ok(())
-        // }
-        // Err(Error::<T>::NotOwner.into())
         Ok(())
     }
 
     /// Get the identity owner if set.
     /// If never changed, returns the identity as its owner.
     fn identity_owner(identity: &T::AccountId) -> T::AccountId {
-        <OwnerOf<T>>::get(&identity).unwrap_or(identity.clone())
-        // match Self::owner_of(identity) {
-        //     Some(id) => id,
-        //     None => identity.clone(),
-        // }
+        <OwnerOf<T>>::get(identity).unwrap_or(identity.clone())
     }
 
     /// Validates if a delegate belongs to an identity and it has not expired.
@@ -444,10 +433,10 @@ impl<T: Config> Did<T::AccountId, T::BlockNumber, <<T as Config>::Time as Time>:
         delegate_type: &[u8],
         valid_for: Option<T::BlockNumber>,
     ) -> DispatchResult {
-        Self::is_owner(&identity, who)?;
+        Self::is_owner(identity, who)?;
         ensure!(who != delegate, Error::<T>::InvalidDelegate);
         ensure!(
-            !Self::valid_listed_delegate(identity, delegate_type, delegate).is_ok(),
+            Self::valid_listed_delegate(identity, delegate_type, delegate).is_err(),
             Error::<T>::InvalidDelegate
         );
 
@@ -482,8 +471,8 @@ impl<T: Config> Did<T::AccountId, T::BlockNumber, <<T as Config>::Time as Time>:
         signer: &T::AccountId,
     ) -> DispatchResult {
         // Owner or a delegate signer.
-        Self::valid_delegate(&identity, b"x25519VerificationKey2018", &signer)?;
-        Self::check_signature(&signature, &msg, &signer)
+        Self::valid_delegate(identity, b"x25519VerificationKey2018", signer)?;
+        Self::check_signature(signature, msg, signer)
     }
 
     /// Adds a new attribute to an identity and colects the storage fee.
@@ -494,7 +483,7 @@ impl<T: Config> Did<T::AccountId, T::BlockNumber, <<T as Config>::Time as Time>:
         value: &[u8],
         valid_for: Option<T::BlockNumber>,
     ) -> DispatchResult {
-        Self::is_owner(&identity, &who)?;
+        Self::is_owner(identity, who)?;
 
         if Self::attribute_and_id(identity, name).is_some() {
             Err(Error::<T>::AttributeCreationFailed.into())
@@ -506,11 +495,11 @@ impl<T: Config> Did<T::AccountId, T::BlockNumber, <<T as Config>::Time as Time>:
                 None => u32::max_value().into(),
             };
 
-            let mut nonce = <AttributedNonce<T>>::get(&identity, name.to_vec());
+            let mut nonce = <AttributedNonce<T>>::get(identity, name.to_vec());
             let id = (&identity, name, nonce).using_encoded(blake2_256);
             let new_attribute = Attribute {
-                name: (&name).to_vec(),
-                value: (&value).to_vec(),
+                name: name.to_vec(),
+                value: value.to_vec(),
                 validity,
                 creation: now_timestamp,
                 nonce,
@@ -518,8 +507,8 @@ impl<T: Config> Did<T::AccountId, T::BlockNumber, <<T as Config>::Time as Time>:
 
             // Prevent panic overflow
             nonce = nonce.checked_add(1).ok_or(Error::<T>::Overflow)?;
-            <AttributeOf<T>>::insert(&identity, &id, new_attribute);
-            <AttributedNonce<T>>::insert(&identity, name.to_vec(), nonce);
+            <AttributeOf<T>>::insert(identity, id, new_attribute);
+            <AttributedNonce<T>>::insert(identity, name.to_vec(), nonce);
             <UpdatedBy<T>>::insert(identity, (who, now_block_number, now_timestamp));
             Ok(())
         }
@@ -527,13 +516,13 @@ impl<T: Config> Did<T::AccountId, T::BlockNumber, <<T as Config>::Time as Time>:
 
     /// Updates the attribute validity to make it expire and invalid.
     fn reset_attribute(who: T::AccountId, identity: &T::AccountId, name: &[u8]) -> DispatchResult {
-        Self::is_owner(&identity, &who)?;
+        Self::is_owner(identity, &who)?;
         // If the attribute contains_key, the latest valid block is set to the current block.
         let result = Self::attribute_and_id(identity, name);
         match result {
             Some((mut attribute, id)) => {
                 attribute.validity = <frame_system::Pallet<T>>::block_number();
-                <AttributeOf<T>>::insert(&identity, id, attribute);
+                <AttributeOf<T>>::insert(identity, id, attribute);
             }
             None => return Err(Error::<T>::AttributeResetFailed.into()),
         }
@@ -575,7 +564,7 @@ impl<T: Config> Did<T::AccountId, T::BlockNumber, <<T as Config>::Time as Time>:
         identity: &T::AccountId,
         name: &[u8],
     ) -> Option<AttributedId<T::BlockNumber, <<T as Config>::Time as Time>::Moment>> {
-        let nonce = <AttributedNonce<T>>::get(&identity, name.to_vec());
+        let nonce = <AttributedNonce<T>>::get(identity, name.to_vec());
 
         // Used for first time attribute creation
         let lookup_nonce = match nonce {
@@ -586,10 +575,7 @@ impl<T: Config> Did<T::AccountId, T::BlockNumber, <<T as Config>::Time as Time>:
         // Looks up for the existing attribute.
         // Needs to use actual attribute nonce -1.
         let id = (&identity, name, lookup_nonce).using_encoded(blake2_256);
-        match <AttributeOf<T>>::get(&identity, &id) {
-            Some(attr) => Some((attr, id)),
-            None => None
-        }
+        <AttributeOf<T>>::get(identity, id).map(|attr| (attr, id))
     }
 }
 
@@ -604,7 +590,7 @@ impl<T: Config> Pallet<T> {
         Self::valid_signer(
             &transaction.identity,
             &transaction.signature,
-            &encoded,
+            encoded,
             &transaction.signer,
         )?;
         Self::is_owner(&transaction.identity, &transaction.signer)?;
