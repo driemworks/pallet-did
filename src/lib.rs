@@ -155,7 +155,7 @@ pub mod pallet {
         Blake2_128,
         Vec<u8>,
         u64,
-        OptionQuery,
+        ValueQuery,
     >;
 
     /// Identity owner.
@@ -506,7 +506,7 @@ impl<T: Config> Did<T::AccountId, T::BlockNumber, <<T as Config>::Time as Time>:
                 None => u32::max_value().into(),
             };
 
-            let mut nonce = <AttributedNonce<T>>::get(&identity, name.to_vec()).unwrap_or(0);
+            let mut nonce = <AttributedNonce<T>>::get(&identity, name.to_vec());
             let id = (&identity, name, nonce).using_encoded(blake2_256);
             let new_attribute = Attribute {
                 name: (&name).to_vec(),
@@ -579,8 +579,8 @@ impl<T: Config> Did<T::AccountId, T::BlockNumber, <<T as Config>::Time as Time>:
 
         // Used for first time attribute creation
         let lookup_nonce = match nonce {
-            Some(nonce) => nonce - 1u64,
-            None => 0u64,
+            0u64 => 0u64,
+            _ => nonce - 1u64,
         };
 
         // Looks up for the existing attribute.

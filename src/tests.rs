@@ -1,3 +1,4 @@
+use super::*;
 use crate::did::Did;
 use crate::{mock::*, AttributeTransaction, Error};
 use codec::Encode;
@@ -52,7 +53,7 @@ fn validate_delegated_claim() {
         // Add signer delegate
         assert_ok!(
             DID::add_delegate(
-                Origin::signed(satoshi_public.clone()),
+                RuntimeOrigin::signed(satoshi_public.clone()),
                 satoshi_public,  // owner
                 nakamoto_public, // new signer delgate
                 delegate_type,   // "Sr25519VerificationKey2018"
@@ -96,7 +97,7 @@ fn add_on_chain_and_revoke_off_chain_attribute() {
 
         // Add a new attribute to an identity. Valid until block 1 + 1000.
         assert_ok!(DID::add_attribute(
-            Origin::signed(alice_public),
+            RuntimeOrigin::signed(alice_public),
             alice_public,
             name.clone(),
             value.clone(),
@@ -128,7 +129,7 @@ fn add_on_chain_and_revoke_off_chain_attribute() {
 
         // Revoke with off-chain signed transaction.
         assert_ok!(DID::execute(
-            Origin::signed(alice_public),
+            RuntimeOrigin::signed(alice_public),
             revoke_transaction
         ));
 
@@ -152,7 +153,7 @@ fn attacker_to_transfer_identity_should_fail() {
         // Transfer identity ownership to attacker
         assert_noop!(
             DID::change_owner(
-                Origin::signed(account_key("BadBoy")),
+                RuntimeOrigin::signed(account_key("BadBoy")),
                 account_key("Alice"),
                 account_key("BadBoy")
             ),
@@ -185,7 +186,7 @@ fn attacker_add_new_delegate_should_fail() {
         // Attacker should fail to add delegate.
         assert_noop!(
             DID::add_delegate(
-                Origin::signed(account_key("BadBoy")),
+                RuntimeOrigin::signed(account_key("BadBoy")),
                 account_key("Alice"),
                 account_key("BadBoy"),
                 vec![7, 7, 7],
@@ -207,30 +208,30 @@ fn add_remove_add_remove_attr() {
     new_test_ext().execute_with(|| {
         let acct = "Alice";
         let vec = vec![7, 7, 7];
-        assert_eq!(DID::nonce_of((account_key(acct), vec.to_vec())), 0);
+        assert_eq!(crate::AttributedNonce::<Test>::get(account_key(acct), vec.to_vec()), 0);
         assert_ok!(DID::add_attribute(
-            Origin::signed(account_key(acct)),
+            RuntimeOrigin::signed(account_key(acct)),
             account_key(acct),
             vec.to_vec(),
             vec.to_vec(),
             None
         ));
-        assert_eq!(DID::nonce_of((account_key(acct), vec.to_vec())), 1);
+        assert_eq!(crate::AttributedNonce::<Test>::get(account_key(acct), vec.to_vec()), 1);
         assert_ok!(DID::delete_attribute(
-            Origin::signed(account_key(acct)),
+            RuntimeOrigin::signed(account_key(acct)),
             account_key(acct),
             vec.to_vec()
         ));
         assert_ok!(DID::add_attribute(
-            Origin::signed(account_key(acct)),
+            RuntimeOrigin::signed(account_key(acct)),
             account_key(acct),
             vec.to_vec(),
             vec.to_vec(),
             None
         ));
-        assert_eq!(DID::nonce_of((account_key(acct), vec.to_vec())), 2);
+        assert_eq!(crate::AttributedNonce::<Test>::get(account_key(acct), vec.to_vec()), 2);
         assert_ok!(DID::delete_attribute(
-            Origin::signed(account_key(acct)),
+            RuntimeOrigin::signed(account_key(acct)),
             account_key(acct),
             vec.to_vec()
         ));
